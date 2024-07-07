@@ -1,0 +1,34 @@
+{
+  "player": {
+    "Single": {
+      "x": 16,
+      "y": 16,
+      "width": 16,
+      "height": 16
+    }
+  },
+  "snowball": {
+    "Single": {
+      "x": 0,
+      "y": 16,
+      "width": 16,
+      "height": 16
+    }
+  },
+  "target": {
+    "Single": {
+      "x": 16,
+      "y": 0,
+      "width": 16,
+      "height": 16
+    }
+  },
+  "zombie": {
+    "Single": {
+      "x": 0,
+      "y": 0,
+      "width": 16,
+      "height": 16
+    }
+  }
+}
