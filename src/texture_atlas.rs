@@ -80,10 +80,7 @@ impl RawRegion {
                 src.x += x_offset;
                 src.y += y_offset;
 
-                TextureRegion {
-                    texture,
-                    src,
-                }
+                TextureRegion { texture, src }
             }),
             Self::NormalPair(mut albedo, mut normal) => Region::NormalPair({
                 albedo.x += x_offset;

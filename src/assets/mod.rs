@@ -1,14 +1,21 @@
-use std::{borrow::Borrow, collections::HashMap, rc::Rc, hash::Hash};
-use anyhow::{Result, anyhow};
-use crate::{texture::{Texture, TextureCreator}, texture_atlas::TextureAtlas};
+use crate::{
+    texture::{Texture, TextureCreator},
+    texture_atlas::TextureAtlas,
+};
+use anyhow::{anyhow, Result};
+use std::{borrow::Borrow, collections::HashMap, hash::Hash, rc::Rc};
 
 const ASSETS_LOCATION: &str = "assets/";
-pub struct AssetStorage<K, R> 
-where K: Hash + Eq {
+pub struct AssetStorage<K, R>
+where
+    K: Hash + Eq,
+{
     cache: HashMap<K, Rc<R>>,
 }
-impl<K, R> AssetStorage<K, R> 
-where K: Hash + Eq {
+impl<K, R> AssetStorage<K, R>
+where
+    K: Hash + Eq,
+{
     pub fn new() -> Self {
         AssetStorage {
             cache: HashMap::new(),
@@ -50,7 +57,10 @@ impl<'a> AssetLoader<'a, TextureAtlas> for TextureCreator<'a> {
 
     fn load(&self, data: &Self::Args) -> Result<TextureAtlas> {
         let image = self.load(ASSETS_LOCATION.to_owned() + "/textures/sheet_" + data + ".png")?;
-        TextureAtlas::load(image, ASSETS_LOCATION.to_owned() + "/textures/" + data + ".json").map_err(|e| anyhow!(e))
+        TextureAtlas::load(
+            image,
+            ASSETS_LOCATION.to_owned() + "/textures/" + data + ".json",
+        )
+        .map_err(|e| anyhow!(e))
     }
 }
-

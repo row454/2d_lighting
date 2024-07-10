@@ -1,4 +1,3 @@
-
 use winit::dpi::PhysicalSize;
 
 pub struct Camera {
@@ -27,7 +26,6 @@ impl CameraUniform {
     }
 }
 
-
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
@@ -36,16 +34,26 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     0.0, 0.0, 0.5, 1.0,
 );
 
-
+pub const VIEWPORT_WIDTH: f32 = 320.0;
+pub const VIEWPORT_HEIGHT: f32 = 180.0;
+pub const MAX_DEPTH: f32 = 500.0;
+pub const MIN_DEPTH: f32 = -500.0;
 impl Camera {
     fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
         // 1.
         let view = cgmath::Matrix4::from_translation((-self.pos.x, -self.pos.y, 0.0).into());
         // let rot = cgmath::Matrix4::from_angle_x(-self.angle);
         // 2.
-        let proj = cgmath::ortho(-160.0, 160.0, -90.0, 90.0, -500.0, 500.0);
+        let proj = cgmath::ortho(
+            -VIEWPORT_WIDTH / 2.0,
+            VIEWPORT_WIDTH / 2.0,
+            -VIEWPORT_HEIGHT / 2.0,
+            VIEWPORT_HEIGHT / 2.0,
+            MIN_DEPTH,
+            MAX_DEPTH,
+        );
         // 3.
-        
+
         OPENGL_TO_WGPU_MATRIX * proj * view
     }
 }
