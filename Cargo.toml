@@ -29,3 +29,6 @@ codegen-units = 1
 opt-level = 's'
 strip = true
 panic = "abort"
+
+[workspace]
+members = ["texture_packer"]

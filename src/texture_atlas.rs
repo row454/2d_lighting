@@ -9,6 +9,7 @@ pub struct TextureRegion {
     pub texture: Arc<Texture>,
     pub src: Rect,
 }
+
 impl std::fmt::Debug for TextureRegion {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("TextureRegion")
@@ -16,6 +17,22 @@ impl std::fmt::Debug for TextureRegion {
             .finish()
     }
 }
+
+#[derive(Clone)]
+pub struct DeferredTextureRegion {
+    pub texture: Arc<Texture>,
+    pub albedo: Rect,
+    pub normal: Rect,
+}
+impl std::fmt::Debug for DeferredTextureRegion {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("NormalPairTextureRegion")
+            .field("albedo", &self.albedo)
+            .field("normal", &self.normal)
+            .finish()
+    }
+}
+
 pub struct TextureAtlas {
     image: Arc<Texture>,
     regions: HashMap<String, Rc<Region>>,
@@ -51,6 +68,7 @@ impl TextureAtlas {
 #[derive(Deserialize)]
 enum RawRegion {
     Single(Rect),
+    NormalPair(Rect, Rect),
     Animation(Rect, Vec<RawRegion>),
     Atlas(Rect, HashMap<String, RawRegion>),
 }
@@ -64,7 +82,19 @@ impl RawRegion {
 
                 TextureRegion {
                     texture,
-                    src: src.into(),
+                    src,
+                }
+            }),
+            Self::NormalPair(mut albedo, mut normal) => Region::NormalPair({
+                albedo.x += x_offset;
+                albedo.y += y_offset;
+                normal.x += x_offset;
+                normal.y += y_offset;
+
+                DeferredTextureRegion {
+                    texture,
+                    albedo,
+                    normal,
                 }
             }),
             Self::Animation(mut src, raw_frames) => {
@@ -104,13 +134,22 @@ pub struct Rect {
 #[derive(Clone, Debug)]
 pub enum Region {
     Single(TextureRegion),
+    NormalPair(DeferredTextureRegion),
     Animation(Vec<Region>),
     Atlas(HashMap<String, Region>),
 }
 
+#[allow(dead_code)]
 impl Region {
     pub fn expect_single(&self, reason: &'static str) -> TextureRegion {
         if let Self::Single(region) = self {
+            region.to_owned()
+        } else {
+            panic!("{reason}: {self:?}");
+        }
+    }
+    pub fn expect_pair(&self, reason: &'static str) -> DeferredTextureRegion {
+        if let Self::NormalPair(region) = self {
             region.to_owned()
         } else {
             panic!("{reason}: {self:?}");
@@ -132,6 +171,13 @@ impl Region {
     }
     pub fn unwrap_single(&self) -> TextureRegion {
         if let Self::Single(region) = self {
+            region.to_owned()
+        } else {
+            panic!("unwrap_single failed, was given: {self:?}");
+        }
+    }
+    pub fn unwrap_pair(&self) -> DeferredTextureRegion {
+        if let Self::NormalPair(region) = self {
             region.to_owned()
         } else {
             panic!("unwrap_single failed, was given: {self:?}");

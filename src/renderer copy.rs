@@ -61,86 +61,6 @@ impl SpriteBatch {
     }
 }
 
-struct Lights {
-    lights: Vec<((f32, f32, f32), Light)>
-}
-// impl Lights {
-//     fn new() -> Lights {
-//         Lights {
-//             lights: Vec::new(),
-//         }
-//     }
-//     fn gen_vecs() {
-//         let mut vertices = Vec::new();
-//         let mut indices: Vec<u16> = Vec::new();
-//         for (index, (position, light)) in self.lights.iter().enumerate() {
-//             match light {
-//                 Light::Point {
-//                     intensity,
-//                     falloff,
-//                     radius,
-//                     max_angle,
-//                     min_angle,
-//                     color,
-//                 } => {
-//                     vertices.push(Vertex {
-//                         position: [position.0, position.1, position.2],
-//                         tex_coords: [region.src.x as f32 / region.texture.width() as f32, (region.src.y + region.src.height) as f32/region.texture.height() as f32]
-//                     });
-//                     vertices.push(Vertex {
-//                         position: [position.0+region.src.width as f32, position.1, position.2],
-//                         tex_coords: [(region.src.x + region.src.width) as f32 / region.texture.width() as f32 , (region.src.y + region.src.height) as f32/region.texture.height() as f32]
-//                     });
-//                     vertices.push(Vertex {
-//                         position: [position.0+region.src.width as f32, position.1+region.src.height as f32, position.2],
-//                         tex_coords: [(region.src.x + region.src.width) as f32 / region.texture.width() as f32, region.src.y as f32/region.texture.height() as f32]
-//                     });
-//                     vertices.push(Vertex {
-//                         position: [position.0, position.1+region.src.height as f32, position.2],
-//                         tex_coords: [region.src.x as f32 / region.texture.width() as f32, region.src.y as f32/region.texture.height() as f32]
-//                     });
-//                     indices.extend_from_slice(&[
-//                         (4 * index).try_into().unwrap(), (1 + 4 * index).try_into().unwrap(), (2 + 4 * index).try_into().unwrap(),
-//                         (2 + 4 * index).try_into().unwrap(), (3 + 4 * index).try_into().unwrap(), (4 * index).try_into().unwrap()]);
-//                 }
-//             }
-//         (vertices, indices)
-//         }
-//     }
-// }
-
-enum Light {
-    Point {
-        intensity: f32,
-        falloff: bool,
-        radius: f32,
-        max_angle: f32,
-        min_angle: f32,
-        color: [f32; 3]
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct LightVertex {
-    position: [f32; 3],
-    color: [f32; 3],
-}
-
-impl LightVertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
-
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBS,
-        }
-    }
-}
-
 struct DeferredSpriteBatch {
     sprites: Vec<((f32, f32, f32), DeferredTextureRegion)>
 }
@@ -314,7 +234,7 @@ impl<'a> RendererState<'a> {
                 module: &shader,
                 entry_point: "vs_main",
                 buffers: &[
-                    Vertex::desc(),
+                    DeferredVertex::desc(),
                 ],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
@@ -594,9 +514,12 @@ impl<'a> RendererState<'a> {
         }
 
         for (sheet, batch) in self.sprite_batches.iter() {
-            let texture_bind_group_layout = self.device.create_bind_group_layout(&TEXTURE_BIND_GROUP_LAYOUT_DESCRIPTOR);
+
+            let texture_bind_group_layout 
+                = self.device.create_bind_group_layout(&TEXTURE_BIND_GROUP_LAYOUT_DESCRIPTOR);
+
             let texture_bind_group = self.device.create_bind_group(&BindGroupDescriptor {
-                label: Some("deferred_texture_bind_group"),
+                label: Some("texture_bind_group"),
                 layout: &texture_bind_group_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
@@ -623,11 +546,11 @@ impl<'a> RendererState<'a> {
                     usage: wgpu::BufferUsages::INDEX,
                 }
             );
-            println!("{:?} {:?}",vertices, indices);
-            let mut sprite_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("sprite_buffer Pass"),
+
+            let mut g_buffer_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("G-Buffer Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &sprite_buffer.view,
+                    view: &normal_buffer.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.1, g: 0.2, b: 0.3, a: 1. }),
@@ -639,12 +562,14 @@ impl<'a> RendererState<'a> {
                 occlusion_query_set: None,
             });
 
-            sprite_pass.set_pipeline(&self.vertex_pipeline);
-            sprite_pass.set_bind_group(0, &texture_bind_group, &[]);
-            sprite_pass.set_bind_group(1, &self.camera_bind_group, &[]);
-            sprite_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-            sprite_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            sprite_pass.draw_indexed(0..indices.len() as u32, 0, 0..1);
+            g_buffer_pass.set_pipeline(&self.render_pipeline);
+            g_buffer_pass.set_bind_group(0, &texture_bind_group, &[]);
+            g_buffer_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+            g_buffer_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            g_buffer_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            g_buffer_pass.draw_indexed(0..indices.len() as u32, 0, 0..1);
+            
+
         }
         self.deferred_sprite_batches.clear();
         self.sprite_batches.clear();
@@ -718,11 +643,11 @@ impl<'a> RendererState<'a> {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&albedo_buffer.view),
+                        resource: wgpu::BindingResource::TextureView(&sprite_buffer.view),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&albedo_buffer.sampler),
+                        resource: wgpu::BindingResource::Sampler(&sprite_buffer.sampler),
                     }
                 ],
             });
@@ -777,10 +702,5 @@ impl<'a> RendererState<'a> {
         }
     }
 
-    pub fn draw_light(&mut self, position: (f32, f32, f32), light: Light) {
-
-    }
-
 
 }
-

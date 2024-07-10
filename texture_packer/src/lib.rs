@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -106,6 +106,7 @@ impl<T: GenericImageView> From<T> for Rect {
 #[derive(Debug, Serialize)]
 enum Region {
 	Single(Rect),
+	NormalPair(Rect, Rect),
 	Animation(Rect, Vec<Region>),
 	Atlas(Rect, HashMap<String, Region>),
 }
@@ -132,8 +133,47 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(input_folder: P1, crop_output:
 		}
 	}
 
+	let mut normal_pairs = glob::glob(format!("{}/*.png", input_folder.as_ref().display()).as_str())?
+	.filter_map(|e| e.ok())
+	.filter_map(|path| {
+		let mut normal_path = path.clone();
+		normal_path.set_file_name(path.file_stem().unwrap().to_string_lossy().to_string() + "_normal.png");
+		if normal_path.exists() {
+			Some((path, normal_path))
+		} else {
+			None
+		}
+	})
+	.collect::<Vec<_>>();
+	
+	for (name, color, normal) in normal_pairs.iter().filter_map(|paths| 
+			if let (Ok(color), Ok(normal)) = (image::open(&paths.0), image::open(&paths.1)) {
+				Some((paths.0.file_stem().unwrap_or_default().to_str().expect("use utf file names").to_string(), color, normal))
+			} else {
+				None
+			}
+		) {
+		
+		if color.dimensions() != normal.dimensions() {
+			return Err("Normal map dimensions should match its pair's dimensions!".into())
+		}
+		let mut buffer = ImageBuffer::new(color.width(), color.height()*2);
+		buffer.copy_from(&color, 0, 0)?;
+		buffer.copy_from(&normal, 0, color.height())?;
+		buffer.save(PathBuf::from(input_folder.as_ref()).join(String::from("normal_pair_") + &name + ".png"))?;
+	}
+
+
 	let mut images = glob::glob(format!("{}/*.png", input_folder.as_ref().display()).as_str())?
 	.filter_map(|e| e.ok())
+	.filter(|x| {
+		for pair in normal_pairs.iter() {
+			if *x == pair.0 || *x == pair.1 {
+				return false
+			}
+		}
+		true
+	})
 	.filter_map(|file: PathBuf| 
 		if let Ok(img) = image::open(&file) {
 			Some((file.file_stem().unwrap_or_default().to_str().expect("use utf file names").to_string(), img))
@@ -154,10 +194,12 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(input_folder: P1, crop_output:
 			}
 			if strip.used_width + image.width() <= atlas.width() {
 	
-				if name.contains("anim") {
-					regions.insert(name.clone(), Region::Animation(Rect::new(strip.used_width, strip.y, image.width(), image.height()), animations.remove(&name).expect("images containing anim should only be made by this tool")));
-				} else if name.contains("sheet") {
-					regions.insert(name.clone(), Region::Atlas(Rect::new(strip.used_width, strip.y, image.width(), image.height()), atlases.remove(&name).expect("images containing sheet should only be made by this tool")));
+				if name.starts_with("anim_") {
+					regions.insert(name.strip_prefix("anim_").unwrap().to_string(), Region::Animation(Rect::new(strip.used_width, strip.y, image.width(), image.height()), animations.remove(&name).expect("images starting with anim_ should only be made by this tool")));
+				} else if name.starts_with("sheet_") {
+					regions.insert(name.strip_prefix("sheet_").unwrap().to_string(), Region::Atlas(Rect::new(strip.used_width, strip.y, image.width(), image.height()), atlases.remove(&name).expect("images starting with sheet_ should only be made by this tool")));
+				} else if name.starts_with("normal_pair_") {
+					regions.insert(name.strip_prefix("normal_pair_").unwrap().to_string(), Region::NormalPair(Rect::new(strip.used_width, strip.y, image.width(), image.height()/2), Rect::new(strip.used_width, strip.y+image.height()/2, image.width(), image.height()/2)));
 				} else {
 					regions.insert(name.clone(), Region::Single(Rect::new(strip.used_width, strip.y, image.width(), image.height())));
 				}
@@ -229,7 +271,6 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(input_folder: P1, crop_output:
 		}
 		'find_height: while target_height > 0 {
 			for x in 0..target_width {
-				println!("{:?}", atlas.get_pixel(x, target_height-1));
 				if atlas.get_pixel(x, target_height-1)[3] != 0 {
 					break 'find_height;
 				}
@@ -267,7 +308,6 @@ fn expand_region(region: &mut RgbaImage) -> ExpandDirection {
 		ExpandDirection::Width
 	}
 }
-
 fn create_animation<P: AsRef<Path>>(folder: P) -> Result<Vec<Region>, Box<dyn Error>> {
     let subfolders = get_sub_directories(&folder)?;
 	let mut animations = HashMap::<String, Vec<Region>>::new();

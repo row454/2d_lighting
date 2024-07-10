@@ -1,6 +1,7 @@
 use image::GenericImageView;
 use anyhow::*;
-use std::{hash::Hash, path::Path, rc::Rc};
+use wgpu::TextureFormat;
+use std::{hash::Hash, path::Path};
 
 pub struct Texture {
     pub texture: wgpu::Texture,
@@ -14,7 +15,7 @@ pub struct TextureCreator<'a> {
 }
 impl<'a> TextureCreator<'a> {
     pub fn load<P>(&self, path: P) -> Result<Texture> where P: AsRef<Path> {
-        Texture::from_image(&self.device, &self.queue, &image::open(&path)?, path.as_ref().file_name().ok_or(anyhow!("No file name"))?.to_str())
+        Texture::from_image(self.device, self.queue, &image::open(&path)?, path.as_ref().file_name().ok_or(anyhow!("No file name"))?.to_str())
     }
 }
 impl PartialEq for Texture {
@@ -29,6 +30,8 @@ impl Hash for Texture {
         self.texture.global_id().hash(state);
     }
 }
+
+#[allow(dead_code)]
 impl Texture {
     pub fn from_bytes(
         device: &wgpu::Device,
@@ -98,10 +101,51 @@ impl Texture {
         
         Ok(Self { texture, view, sampler })
     }
+    pub fn create_texture(
+        device: &wgpu::Device,
+        label: Option<&str>, 
+        dimensions: (u32, u32),
+        format: TextureFormat,
+    ) -> Result<Self> {
+        let size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
+            depth_or_array_layers: 1,
+        };
+        let texture = device.create_texture(
+            &wgpu::TextureDescriptor {
+                label,
+                size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            }
+        );
+
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler = device.create_sampler(
+            &wgpu::SamplerDescriptor {
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Nearest,
+                min_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::FilterMode::Nearest,
+                ..Default::default()
+            }
+        );
+        
+        Ok(Self { texture, view, sampler })
+    }
     pub fn width(&self) -> u32 {
         self.texture.width()
     }
     pub fn height(&self) -> u32 {
         self.texture.height()
     }
+    
 }

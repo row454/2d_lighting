@@ -1,11 +1,10 @@
-use std::{collections::HashMap, hash::Hash, ops::{Add, AddAssign}, time::Instant};
+use std::{ops::{Add, AddAssign}, time::Instant};
 use assets::TextureAtlasStorage;
 use hecs::World;
 use input::{Control, InputHandler};
 use renderer::RendererState;
-use texture::Texture;
-use texture_atlas::{TextureAtlas, TextureRegion};
-use winit::{dpi::PhysicalSize, event::{ElementState, Event, KeyEvent, WindowEvent}, event_loop::{ControlFlow, EventLoop}, keyboard::{KeyCode, PhysicalKey}, window::{self, Fullscreen, Window, WindowBuilder}};
+use texture_atlas::{DeferredTextureRegion, TextureRegion};
+use winit::{dpi::PhysicalSize, event::{ElementState, Event, KeyEvent, WindowEvent}, event_loop::{ControlFlow, EventLoop}, keyboard::{KeyCode, PhysicalKey}, window::{Window, WindowBuilder}};
 
 mod texture;
 mod camera;
@@ -20,7 +19,6 @@ pub async fn run() {
     let window = WindowBuilder::new().with_min_inner_size(PhysicalSize::new(640, 360)).build(&event_loop).unwrap();
     let mut game = Game::new(&window).await;
     let mut fps = 0;
-    let mut delta = 0;
     let mut delta_sum = 0;
     let mut previous_time = Instant::now();
 
@@ -50,8 +48,7 @@ pub async fn run() {
             _ => {}
         }}
         Event::AboutToWait => {
-            delta = previous_time.elapsed().as_nanos();
-            delta_sum += delta;
+            delta_sum += previous_time.elapsed().as_nanos();
             previous_time = Instant::now();
             if delta_sum > 1_000_000_000 {
                 println!("{}", fps);
@@ -72,6 +69,7 @@ pub async fn run() {
     });
 }
 
+#[allow(dead_code)]
 struct Game<'a> {
     renderer: RendererState<'a>,
     textures: TextureAtlasStorage,
@@ -132,8 +130,8 @@ impl<'a> Game<'a> {
         let mut textures = TextureAtlasStorage::new();
         let entities = textures.load("entities", &renderer.texture_creator()).unwrap();
         let mut world = World::new();
-        world.spawn((Position((0.0, 0.0).into()), entities.get_region("player").unwrap().unwrap_single(), PlayerControlled, Velocity((0., 0.).into())));
-        world.spawn((Position((10.0, 0.0).into()), entities.get_region("zombie").unwrap().unwrap_single()));
+        world.spawn((Position((0.0, 0.0).into()), entities.get_region("player").unwrap().unwrap_pair(), PlayerControlled, Velocity((0., 0.).into())));
+        world.spawn((Position((10.0, 0.0).into()), entities.get_region("zombie").unwrap().unwrap_pair()));
 
         let mut input_handler = InputHandler::new();
         input_handler.register_control(KeyCode::KeyW, Control::MoveUp);
@@ -168,7 +166,7 @@ impl<'a> Game<'a> {
     }
     fn update(&mut self) {
 
-        for (id, (vel, _)) in self.world.query_mut::<(&mut Velocity, &PlayerControlled)>() {
+        for (_, (vel, _)) in self.world.query_mut::<(&mut Velocity, &PlayerControlled)>() {
             vel.0 = (0., 0.).into();
             if self.input_handler.is_pressed(Control::MoveUp) {
                 vel.0 += (0., 1.)
@@ -183,20 +181,40 @@ impl<'a> Game<'a> {
                 vel.0 += (1., 0.)
             }
         }
-        for (id, (pos, vel)) in self.world.query_mut::<(&mut Position, &Velocity)>() {
+        for (_, (pos, vel)) in self.world.query_mut::<(&mut Position, &Velocity)>() {
             pos.0 += vel.0
         }
 
-        for (id, (pos, sprite)) in self.world.query::<(&Position, &TextureRegion)>().iter() {
-            self.renderer.draw_sprite((pos.0.x, pos.0.y, pos.0.y), sprite.clone())
+        for (_, (pos, sprite)) in self.world.query::<(&Position, &DeferredTextureRegion)>().iter() {
+            self.renderer.draw_deferred_sprite((pos.0.x, pos.0.y, 0.), sprite.clone())
         }
-        //self.renderer.draw_sprite((0.0, 0.0, 0.0), self.textures.load("entities", &self.renderer.texture_creator()).unwrap().get_region("player").unwrap().unwrap_single());
-        //self.renderer.draw_sprite((20.0, 0.0, 0.0), self.textures.load("entities", &self.renderer.texture_creator()).unwrap().get_region("zombie").unwrap().unwrap_single());
+        //self.renderer.draw_sprite((0.0, 0.0, 0.0), self.textures.load("entities", &self.renderer.texture_creator()).unwrap().get_region("target").unwrap().unwrap_single());
+        //self.renderer.draw_sprite((20.0, 0.0, 0.0), self.textures.load("entities", &self.renderer.texture_creator()).unwrap().get_region("snowball").unwrap().unwrap_single());
         
         self.input_handler.update();
     }
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct DeferredVertex {
+    position: [f32; 3],
+    albedo_coords: [f32; 2],
+    normal_coords: [f32; 2],
+}
+
+impl DeferredVertex {
+    const ATTRIBS: [wgpu::VertexAttribute; 3] =
+        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2, 2 => Float32x2];
+
+    fn desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &Self::ATTRIBS,
+        }
+    }
+}
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
@@ -217,4 +235,5 @@ impl Vertex {
         }
     }
 }
+ 
  
