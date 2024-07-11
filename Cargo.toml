@@ -30,5 +30,8 @@ opt-level = 's'
 strip = true
 panic = "abort"
 
+[dependencies.row666_metroidbrainia_macros]
+path = "proc_macros"
+
 [workspace]
-members = ["texture_packer"]
+members = [ "proc_macros","texture_packer"]

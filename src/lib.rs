@@ -2,6 +2,7 @@ use assets::TextureAtlasStorage;
 use hecs::World;
 use input::{Control, InputHandler};
 use renderer::RendererState;
+use row666_metroidbrainia_macros::Vertex;
 use std::{
     ops::{Add, AddAssign},
     time::Instant,
@@ -206,21 +207,14 @@ impl DeferredVertex {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable, Vertex)]
+struct MyVertex {
     position: [f32; 3],
     tex_coords: [f32; 2],
 }
 
-impl Vertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
-
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBS,
-        }
-    }
+trait Vertex {
+    type Attribs;
+    const ATTRIBS: Self::Attribs;
+    fn desc() -> wgpu::VertexBufferLayout<'static>;
 }

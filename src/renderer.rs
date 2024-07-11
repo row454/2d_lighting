@@ -28,67 +28,67 @@ pub struct RendererState<'a> {
     viewport_matrix: [[f32; 4]; 4],
     g_buffer_pipeline: wgpu::RenderPipeline,
 }
-struct SpriteBatch {
-    sprites: Vec<((f32, f32, f32), TextureRegion)>,
-}
-impl SpriteBatch {
-    fn new() -> SpriteBatch {
-        SpriteBatch {
-            sprites: Vec::new(),
-        }
-    }
-    fn gen_vecs(&self) -> (Vec<Vertex>, Vec<u16>) {
-        let mut vertices = Vec::new();
-        let mut indices: Vec<u16> = Vec::new();
-        for (index, (position, region)) in self.sprites.iter().enumerate() {
-            vertices.push(Vertex {
-                position: [position.0, position.1, position.2],
-                tex_coords: [
-                    region.src.x as f32 / region.texture.width() as f32,
-                    (region.src.y + region.src.height) as f32 / region.texture.height() as f32,
-                ],
-            });
-            vertices.push(Vertex {
-                position: [position.0 + region.src.width as f32, position.1, position.2],
-                tex_coords: [
-                    (region.src.x + region.src.width) as f32 / region.texture.width() as f32,
-                    (region.src.y + region.src.height) as f32 / region.texture.height() as f32,
-                ],
-            });
-            vertices.push(Vertex {
-                position: [
-                    position.0 + region.src.width as f32,
-                    position.1 + region.src.height as f32,
-                    position.2,
-                ],
-                tex_coords: [
-                    (region.src.x + region.src.width) as f32 / region.texture.width() as f32,
-                    region.src.y as f32 / region.texture.height() as f32,
-                ],
-            });
-            vertices.push(Vertex {
-                position: [
-                    position.0,
-                    position.1 + region.src.height as f32,
-                    position.2,
-                ],
-                tex_coords: [
-                    region.src.x as f32 / region.texture.width() as f32,
-                    region.src.y as f32 / region.texture.height() as f32,
-                ],
-            });
-            indices.extend_from_slice(&[
-                (4 * index).try_into().unwrap(),
-                (1 + 4 * index).try_into().unwrap(),
-                (2 + 4 * index).try_into().unwrap(),
-                (2 + 4 * index).try_into().unwrap(),
-                (3 + 4 * index).try_into().unwrap(),
-                (4 * index).try_into().unwrap(),
-            ]);
-        }
-        (vertices, indices)
-    }
-}
+// struct SpriteBatch {
+//     sprites: Vec<((f32, f32, f32), TextureRegion)>,
+// }
+// impl SpriteBatch {
+//     fn new() -> SpriteBatch {
+//         SpriteBatch {
+//             sprites: Vec::new(),
+//         }
+//     }
+//     fn gen_vecs(&self) -> (Vec<Vertex>, Vec<u16>) {
+//         let mut vertices = Vec::new();
+//         let mut indices: Vec<u16> = Vec::new();
+//         for (index, (position, region)) in self.sprites.iter().enumerate() {
+//             vertices.push(Vertex {
+//                 position: [position.0, position.1, position.2],
+//                 tex_coords: [
+//                     region.src.x as f32 / region.texture.width() as f32,
+//                     (region.src.y + region.src.height) as f32 / region.texture.height() as f32,
+//                 ],
+//             });
+//             vertices.push(Vertex {
+//                 position: [position.0 + region.src.width as f32, position.1, position.2],
+//                 tex_coords: [
+//                     (region.src.x + region.src.width) as f32 / region.texture.width() as f32,
+//                     (region.src.y + region.src.height) as f32 / region.texture.height() as f32,
+//                 ],
+//             });
+//             vertices.push(Vertex {
+//                 position: [
+//                     position.0 + region.src.width as f32,
+//                     position.1 + region.src.height as f32,
+//                     position.2,
+//                 ],
+//                 tex_coords: [
+//                     (region.src.x + region.src.width) as f32 / region.texture.width() as f32,
+//                     region.src.y as f32 / region.texture.height() as f32,
+//                 ],
+//             });
+//             vertices.push(Vertex {
+//                 position: [
+//                     position.0,
+//                     position.1 + region.src.height as f32,
+//                     position.2,
+//                 ],
+//                 tex_coords: [
+//                     region.src.x as f32 / region.texture.width() as f32,
+//                     region.src.y as f32 / region.texture.height() as f32,
+//                 ],
+//             });
+//             indices.extend_from_slice(&[
+//                 (4 * index).try_into().unwrap(),
+//                 (1 + 4 * index).try_into().unwrap(),
+//                 (2 + 4 * index).try_into().unwrap(),
+//                 (2 + 4 * index).try_into().unwrap(),
+//                 (3 + 4 * index).try_into().unwrap(),
+//                 (4 * index).try_into().unwrap(),
+//             ]);
+//         }
+//         (vertices, indices)
+//     }
+// }
 struct Lights {
     lights: Vec<((f32, f32, f32), Light)>,
 }
@@ -357,49 +357,7 @@ impl<'a> RendererState<'a> {
 
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&texture_bind_group_layout, &camera_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        });
+        
 
         let deferred_shader = device.create_shader_module(wgpu::include_wgsl!("deferred.wgsl"));
 
