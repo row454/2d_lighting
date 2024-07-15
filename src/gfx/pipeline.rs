@@ -1,27 +1,29 @@
 use wgpu::{BindGroupLayout, ColorTargetState, Device, ShaderModuleDescriptor};
 
-struct Pipeline {
-    pipeline: wgpu::RenderPipeline,
+use crate::Vertex;
+
+pub struct Pipeline {
+    pub pipeline: wgpu::RenderPipeline,
 }
 
 impl Pipeline {
     // use wgpu::include_wgsl!("shader.wgsl")
-    fn new<V: >(device: &Device, shader: ShaderModuleDescriptor, bind_group_layouts: &[&BindGroupLayout], targets: &[Option<ColorTargetState>]) -> Pipeline {
+    pub fn new<V: Vertex>(device: &Device, shader: ShaderModuleDescriptor, bind_group_layouts: &[&BindGroupLayout], targets: &[Option<ColorTargetState>], name: &'static str) -> Pipeline {
         let shader = device.create_shader_module(shader);
         let pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
+                label: Some(format!("{} Pipeline Layout", name).as_str()),
                 bind_group_layouts,
                 push_constant_ranges: &[],
             });
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
+            label: Some(format!("{} Pipeline", name).as_str()),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[V::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {

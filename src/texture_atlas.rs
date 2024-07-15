@@ -34,7 +34,7 @@ impl std::fmt::Debug for DeferredTextureRegion {
 }
 
 pub struct TextureAtlas {
-    image: Arc<Texture>,
+    pub image: Arc<Texture>,
     regions: HashMap<String, Rc<Region>>,
 }
 

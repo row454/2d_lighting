@@ -55,6 +55,7 @@ impl Window {
                     _ => {}
                 },
                 Event::AboutToWait => callback(WindowEvent::Draw),
+                Event::LoopExiting => callback(WindowEvent::Closed),
                 _ => {}
             })
             .unwrap();
@@ -72,4 +73,5 @@ pub enum WindowEvent {
     },
     Draw,
     LostFocus,
+    Closed,
 }

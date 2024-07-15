@@ -1,13 +1,14 @@
 use wgpu::InstanceDescriptor;
+use winit::dpi::PhysicalSize;
 
-pub struct GraphicsContext<'a> {
-    pub surface: wgpu::Surface<'a>,
+pub struct GraphicsContext {
+    pub surface: wgpu::Surface<'static>,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
 }
 
-impl<'a> GraphicsContext<'a> {
+impl GraphicsContext {
     pub async fn new(window: &winit::window::Window) -> GraphicsContext {
         let size = &window.inner_size();
 
@@ -17,7 +18,10 @@ impl<'a> GraphicsContext<'a> {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
         });
-        let surface = instance.create_surface(window).unwrap();
+        let surface;
+        unsafe {
+            surface = instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::from_window(window).unwrap()).unwrap();
+        }
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -65,5 +69,10 @@ impl<'a> GraphicsContext<'a> {
             queue,
             config,
         }
+    }
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.config.width = width;
+        self.config.height = height;
+        self.surface.configure(&self.device, &self.config);
     }
 }

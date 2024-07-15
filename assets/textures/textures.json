@@ -1,0 +1,134 @@
+{
+  "tiles": {
+    "Atlas": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 32
+      },
+      {
+        "wall": {
+          "Atlas": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 48,
+              "height": 32
+            },
+            {
+              "corners": {
+                "Single": {
+                  "x": 16,
+                  "y": 16,
+                  "width": 16,
+                  "height": 16
+                }
+              },
+              "all": {
+                "Single": {
+                  "x": 32,
+                  "y": 0,
+                  "width": 16,
+                  "height": 16
+                }
+              },
+              "vertical": {
+                "Single": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 16,
+                  "height": 16
+                }
+              },
+              "none": {
+                "Single": {
+                  "x": 16,
+                  "y": 0,
+                  "width": 16,
+                  "height": 16
+                }
+              },
+              "horizontal": {
+                "Single": {
+                  "x": 0,
+                  "y": 16,
+                  "width": 16,
+                  "height": 16
+                }
+              }
+            }
+          ]
+        },
+        "floor": {
+          "Single": {
+            "x": 48,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        }
+      }
+    ]
+  },
+  "entities": {
+    "Atlas": [
+      {
+        "x": 0,
+        "y": 32,
+        "width": 64,
+        "height": 32
+      },
+      {
+        "snowball": {
+          "Single": {
+            "x": 48,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "player": {
+          "NormalPair": [
+            {
+              "x": 16,
+              "y": 0,
+              "width": 16,
+              "height": 16
+            },
+            {
+              "x": 16,
+              "y": 16,
+              "width": 16,
+              "height": 16
+            }
+          ]
+        },
+        "zombie": {
+          "NormalPair": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 16,
+              "height": 16
+            },
+            {
+              "x": 0,
+              "y": 16,
+              "width": 16,
+              "height": 16
+            }
+          ]
+        },
+        "target": {
+          "Single": {
+            "x": 32,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        }
+      }
+    ]
+  }
+}

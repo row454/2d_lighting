@@ -56,11 +56,19 @@ impl<'a> AssetLoader<'a, TextureAtlas> for TextureCreator<'a> {
     type Args = str;
 
     fn load(&self, data: &Self::Args) -> Result<TextureAtlas> {
-        let image = self.load(ASSETS_LOCATION.to_owned() + "/textures/sheet_" + data + ".png")?;
-        TextureAtlas::load(
-            image,
-            ASSETS_LOCATION.to_owned() + "/textures/" + data + ".json",
-        )
-        .map_err(|e| anyhow!(e))
+        if let Ok(image) = self.load(ASSETS_LOCATION.to_owned() + "/textures/sheet_" + data + ".png") {
+            TextureAtlas::load(
+                image,
+                ASSETS_LOCATION.to_owned() + "/textures/" + data + ".json",
+            )
+            .map_err(|e| anyhow!(e))
+        } else {
+            let image = self.load(ASSETS_LOCATION.to_owned() + "/textures/" + data + ".png")?;
+            TextureAtlas::load(
+                image,
+                ASSETS_LOCATION.to_owned() + "/textures/" + data + ".json",
+            )
+            .map_err(|e| anyhow!(e))
+        }
     }
 }

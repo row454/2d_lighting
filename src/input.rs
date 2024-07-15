@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use winit::{
-    event::KeyEvent,
-    keyboard::{KeyCode, PhysicalKey::Code},
+    event::{ElementState, KeyEvent},
+    keyboard::{KeyCode, PhysicalKey::{self, Code}},
 };
 pub struct InputHandler {
     key_map: HashMap<KeyCode, Vec<usize>>,
@@ -51,10 +51,10 @@ impl InputHandler {
         self.key_state.push(KeyState::default());
         self.pair_count += 1;
     }
-    pub fn handle_input(&mut self, event: &KeyEvent) {
-        if let Code(key) = event.physical_key {
+    pub fn handle_input(&mut self, physical_key: PhysicalKey, state: ElementState) {
+        if let Code(key) = physical_key {
             if let Some(indices) = self.key_map.get(&key) {
-                let state = match event.state {
+                let state = match state {
                     winit::event::ElementState::Pressed => KeyState::Pressed,
                     winit::event::ElementState::Released => KeyState::Released,
                 };

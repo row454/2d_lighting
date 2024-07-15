@@ -1,5 +1,7 @@
 struct CameraUniform {
     view_proj: mat4x4<f32>,
+    view: mat4x4<f32>,
+    dimensions: vec2f,
 };
 @group(1) @binding(0) // 1.
 var<uniform> camera: CameraUniform;
@@ -16,7 +18,7 @@ struct DeferredVertexOutput {
 }
 
 @vertex
-fn vs_deferred(
+fn vs_main(
     model: DeferredVertexInput,
 ) -> DeferredVertexOutput {
     var out: DeferredVertexOutput;
@@ -36,7 +38,7 @@ var t_deferred: texture_2d<f32>;
 var s_pair: sampler;
 
 @fragment
-fn fs_deferred(in: DeferredVertexOutput) -> DeferredFragmentOutput {
+fn fs_main(in: DeferredVertexOutput) -> DeferredFragmentOutput {
     var out: DeferredFragmentOutput;
     out.albedo_color = textureSample(t_deferred, s_pair, in.albedo_coords);
     out.normal_color = textureSample(t_deferred, s_pair, in.normal_coords);

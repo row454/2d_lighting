@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -26,23 +26,15 @@ use serde::Serialize;
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     println!("Reading input folder: {}", config.input_folder);
-
-    let sub_directories = get_sub_directories(&config.input_folder)?;
-    for sub_directory in sub_directories {
-        println!("Found sub directory: {}", sub_directory.display());
-        let atlas = create_atlas(&sub_directory, false, &config.output_folder)?;
+    if config.combine_all {
+        let directory = PathBuf::from(&config.input_folder);
+        let atlas = create_atlas(&directory, false, &config.output_folder, Some("textures"))?;
         if config.pretty {
             serde_json::to_writer_pretty(
                 &File::create(
                     [
                         &config.output_folder,
-                        &(sub_directory
-                            .file_name()
-                            .expect("folders must have names")
-                            .to_str()
-                            .expect("use utf file names")
-                            .to_string()
-                            + ".json"),
+                        &String::from("textures.json"),
                     ]
                     .iter()
                     .collect::<PathBuf>(),
@@ -54,7 +46,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
                 &File::create(
                     [
                         &config.output_folder,
-                        &(sub_directory
+                        &(directory
                             .file_name()
                             .expect("folders must have names")
                             .to_str()
@@ -68,6 +60,49 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
                 &atlas,
             )?;
         }
+    } else {
+        let sub_directories = get_sub_directories(&config.input_folder)?;
+        for sub_directory in sub_directories {
+            println!("Found sub directory: {}", sub_directory.display());
+            let atlas = create_atlas(&sub_directory, false, &config.output_folder, None)?;
+            if config.pretty {
+                serde_json::to_writer_pretty(
+                    &File::create(
+                        [
+                            &config.output_folder,
+                            &(sub_directory
+                                .file_name()
+                                .expect("folders must have names")
+                                .to_str()
+                                .expect("use utf file names")
+                                .to_string()
+                                + ".json"),
+                        ]
+                        .iter()
+                        .collect::<PathBuf>(),
+                    )?,
+                    &atlas,
+                )?;
+            } else {
+                serde_json::to_writer(
+                    &File::create(
+                        [
+                            &config.output_folder,
+                            &(sub_directory
+                                .file_name()
+                                .expect("folders must have names")
+                                .to_str()
+                                .expect("use utf file names")
+                                .to_string()
+                                + ".json"),
+                        ]
+                        .iter()
+                        .collect::<PathBuf>(),
+                    )?,
+                    &atlas,
+                )?;
+            }
+        }
     }
     Ok(())
 }
@@ -75,6 +110,7 @@ pub struct Config {
     pub input_folder: String,
     pub output_folder: String,
     pub pretty: bool,
+    pub combine_all: bool,
 }
 impl Config {
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
@@ -83,12 +119,17 @@ impl Config {
         }
         let input_folder = args[1].clone();
         let output_folder = args[2].clone();
-        let pretty = args
-            .get(3)
-            .unwrap_or(&"true".to_string())
-            .clone()
-            .parse::<bool>()
-            .map_err(|_| "3rd option should be true or false")?;
+        let mut pretty = false;
+        let mut combine_all = false;
+        if args.len() >= 3 {
+            for arg in &args[3..] {
+                match arg.to_lowercase().as_str() {
+                    "-p" => pretty = true,
+                    "-c" => combine_all = true,
+                    _ => println!("flag {arg} was not recognized")
+                }
+            }
+        }
 
         if !Path::new(&input_folder).is_dir() || !Path::new(&output_folder).is_dir() {
             if Path::new(&input_folder).is_dir()
@@ -105,6 +146,7 @@ impl Config {
             input_folder,
             output_folder,
             pretty,
+            combine_all,
         })
     }
 }
@@ -172,9 +214,10 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(
     input_folder: P1,
     crop_output: bool,
     output_folder: P2,
+    name_override: Option<&str>
 ) -> Result<HashMap<String, Region>, Box<dyn Error>> {
-    println!("{}", input_folder.as_ref().display());
     let mut regions: HashMap<String, Region> = HashMap::new();
+    println!("creating atlas from {}", input_folder.as_ref().as_os_str().to_str().unwrap());
 
     let subfolders = get_sub_directories(&input_folder)?;
     let mut animations = HashMap::<String, Vec<Region>>::new();
@@ -204,7 +247,7 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(
                         .unwrap_or_default()
                         .to_str()
                         .expect("use utf file names"),
-                create_atlas(folder, true, &input_folder)?,
+                create_atlas(folder, true, &input_folder, None)?,
             );
         }
     }
@@ -292,7 +335,7 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(
         atlases: &mut HashMap<String, HashMap<String, Region>>,
         animations: &mut HashMap<String, Vec<Region>>,
     ) -> Result<(), Box<dyn Error>> {
-        println!("adding: {}", name);
+        println!("adding {name}");
         for strip in strips.iter_mut() {
             if strip.height < image.height() {
                 continue;
@@ -344,7 +387,7 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(
                 }
                 atlas.copy_from(&image, strip.used_width, strip.y)?;
                 strip.used_width += image.width();
-                println!("added");
+                println!("{:?}", regions);
                 return Ok(());
             }
         }
@@ -364,24 +407,37 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(
         if atlas.height() >= latest_strip.y + latest_strip.height + image.height() {
             let strip = add_strip(strips, &image);
             if strip.used_width + image.width() <= atlas.width() {
-                if name.contains("anim") {
+                if name.starts_with("anim_") {
                     regions.insert(
-                        name.clone(),
+                        name.strip_prefix("anim_").unwrap().to_string(),
                         Region::Animation(
                             Rect::new(strip.used_width, strip.y, image.width(), image.height()),
-                            animations
-                                .remove(&name)
-                                .expect("images containing anim should only be made by this tool"),
+                            animations.remove(&name).expect(
+                                "images starting with anim_ should only be made by this tool",
+                            ),
                         ),
                     );
-                } else if name.contains("sheet") {
+                } else if name.starts_with("sheet_") {
                     regions.insert(
-                        name.clone(),
+                        name.strip_prefix("sheet_").unwrap().to_string(),
                         Region::Atlas(
                             Rect::new(strip.used_width, strip.y, image.width(), image.height()),
-                            atlases
-                                .remove(&name)
-                                .expect("images containing sheet should only be made by this tool"),
+                            atlases.remove(&name).expect(
+                                "images starting with sheet_ should only be made by this tool",
+                            ),
+                        ),
+                    );
+                } else if name.starts_with("normal_pair_") {
+                    regions.insert(
+                        name.strip_prefix("normal_pair_").unwrap().to_string(),
+                        Region::NormalPair(
+                            Rect::new(strip.used_width, strip.y, image.width(), image.height() / 2),
+                            Rect::new(
+                                strip.used_width,
+                                strip.y + image.height() / 2,
+                                image.width(),
+                                image.height() / 2,
+                            ),
                         ),
                     );
                 } else {
@@ -397,7 +453,6 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(
                 }
                 atlas.copy_from(&image, strip.used_width, strip.y)?;
                 strip.used_width += image.width();
-                println!("added");
                 Ok(())
             } else {
                 expand_region(atlas);
@@ -432,7 +487,6 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(
     }
 
     if crop_output {
-        println!("cropping {}", input_folder.as_ref().display());
         let mut target_width = atlas.width();
         let mut target_height = atlas.height();
         'find_width: while target_width > 0 {
@@ -460,18 +514,23 @@ fn create_atlas<P1: AsRef<Path>, P2: AsRef<Path>>(
         )?;
         atlas = new_atlas;
     }
-    atlas.save(
-        output_folder.as_ref().join(PathBuf::from(
-            String::from("sheet_")
-                + input_folder
-                    .as_ref()
-                    .file_stem()
-                    .unwrap()
-                    .to_str()
-                    .expect("use utf file names")
-                + ".png",
-        )),
-    )?;
+    if let Some(name) = name_override {
+        atlas.save(output_folder.as_ref().join(PathBuf::from(String::from(name) + ".png")))?;
+    } else {
+        atlas.save(
+            output_folder.as_ref().join(PathBuf::from(
+                String::from("sheet_")
+                    + input_folder
+                        .as_ref()
+                        .file_stem()
+                        .unwrap()
+                        .to_str()
+                        .expect("use utf file names")
+                    + ".png",
+            )),
+        )?;
+    }
+
 
     Ok(regions)
 }
@@ -525,7 +584,7 @@ fn create_animation<P: AsRef<Path>>(folder: P) -> Result<Vec<Region>, Box<dyn Er
                         .unwrap_or_default()
                         .to_str()
                         .expect("use utf file names"),
-                create_atlas(&folder, true, &folder)?,
+                create_atlas(&folder, true, &folder, None)?,
             );
         }
     }
