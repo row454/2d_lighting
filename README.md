@@ -1,0 +1,1 @@
+A 2D lighting engine I wrote to learn the basics of graphics programming, using wgpu. Inspired by the beautiful graphics of the game Animal Well, which uses 2d deferred shading with manually drawn normal maps for each sprite.
